@@ -1,18 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Photo Frame Viewer</title>
+    <title>Realistic Photo Frame Viewer</title>
     <style>
         body { margin: 0; background: #f0f0f0; }
-        canvas { display: block;
-                   max-height: 80vh;
-    max-width: 100%;
-    margin: auto;}
+        canvas { display: block; }
         #controls {
             position: fixed;
             top: 20px;
             left: 20px;
-            background: white;
+            background: rgba(255, 255, 255, 0.9);
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -26,81 +23,115 @@
             transform: translate(-50%, -50%);
             font-family: Arial, sans-serif;
             background: white;
-            padding: 10px;
+            padding: 10px 20px;
             border-radius: 4px;
             display: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .control-btn {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <div id="controls">
         <input type="file" id="imageUpload" accept="image/*">
+        <button class="control-btn" id="resetPosition">Reset View</button>
     </div>
     <div id="status">Loading...</div>
-    <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.159.0/three.min.js"></script>
+    <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         window.addEventListener('load', () => {
             let scene, camera, renderer, frame;
             const status = document.getElementById('status');
+            let targetRotationX = -0.1;
+            let targetRotationY = 0.3;
+            let isDragging = false;
 
             function init() {
+                // Scene setup
                 scene = new THREE.Scene();
                 scene.background = new THREE.Color(0xf0f0f0);
 
+                // Camera setup
                 camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
                 camera.position.set(0, 0, 5);
+                camera.lookAt(0, 0, 0);
 
+                // Renderer setup
                 renderer = new THREE.WebGLRenderer({ antialias: true });
                 renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 document.body.appendChild(renderer.domElement);
 
-                // Enhanced lighting setup
-                const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+                // Lighting setup
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
                 scene.add(ambientLight);
 
-                const frontLight = new THREE.DirectionalLight(0xffffff, 1.0);
-                frontLight.position.set(0, 0, 2);
-                scene.add(frontLight);
+                const mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+                mainLight.position.set(2, 5, 3);
+                mainLight.castShadow = true;
+                mainLight.shadow.mapSize.width = 1024;
+                mainLight.shadow.mapSize.height = 1024;
+                scene.add(mainLight);
 
-                // Initial setup with default image
+                // Floor setup
+                const floorGeometry = new THREE.PlaneGeometry(20, 20);
+                const floorMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xdddddd,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                scene.add(floor);
+
+                // Event listeners
+                setupEventListeners();
                 createPhotoFrame('https://thestackhouse.com/cdn/shop/files/article1_840x560.webp?v=1728383842');
+            }
 
-                // File upload handler
-                document.getElementById('imageUpload').addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        const url = URL.createObjectURL(file);
-                        createPhotoFrame(url);
-                    }
+            function setupEventListeners() {
+                // File upload
+                document.getElementById('imageUpload').addEventListener('change', handleFileUpload);
+                
+                // Reset view
+                document.getElementById('resetPosition').addEventListener('click', () => {
+                    targetRotationX = -0.1;
+                    targetRotationY = 0.3;
                 });
 
-                // Simple rotation controls
-                let isMouseDown = false;
-                let previousMousePosition = { x: 0, y: 0 };
+                // Mouse controls
+                const onMouseDown = (e) => {
+                    isDragging = true;
+                    renderer.domElement.style.cursor = 'grabbing';
+                };
 
-                renderer.domElement.addEventListener('mousedown', (e) => {
-                    isMouseDown = true;
-                    previousMousePosition = { x: e.clientX, y: e.clientY };
-                });
+                const onMouseUp = () => {
+                    isDragging = false;
+                    renderer.domElement.style.cursor = 'grab';
+                };
 
-                document.addEventListener('mousemove', (e) => {
-                    if (!isMouseDown) return;
+                const onMouseMove = (e) => {
+                    if (!isDragging) return;
                     
-                    const deltaMove = {
-                        x: e.clientX - previousMousePosition.x,
-                        y: e.clientY - previousMousePosition.y
-                    };
+                    targetRotationY += e.movementX * 0.005;
+                    targetRotationX += e.movementY * 0.005;
+                };
 
-                    if (frame) {
-                        frame.rotation.y += deltaMove.x * 0.005;
-                        frame.rotation.x += deltaMove.y * 0.005;
-                    }
-
-                    previousMousePosition = { x: e.clientX, y: e.clientY };
-                });
-
-                document.addEventListener('mouseup', () => isMouseDown = false);
+                renderer.domElement.addEventListener('mousedown', onMouseDown);
+                document.addEventListener('mouseup', onMouseUp);
+                document.addEventListener('mousemove', onMouseMove);
                 window.addEventListener('resize', onWindowResize);
+                renderer.domElement.style.cursor = 'grab';
             }
 
             function createPhotoFrame(imageUrl) {
@@ -111,87 +142,119 @@
                 textureLoader.load(
                     imageUrl,
                     (texture) => {
-                        const width = 4;
-                        const height = width / (texture.image.width / texture.image.height);
-                        const depth = 0.2;
-                        const frameWidth = 0.2;
-
-                        // Remove existing frame if any
                         if (frame) scene.remove(frame);
                         
-                        // Create new frame group
-                        frame = new THREE.Group();
+                        const aspectRatio = texture.image.width / texture.image.height;
+                        const maxWidth = 4; // Maximum width of the frame
+                        const maxHeight = 4; // Maximum height of the frame
 
-                        // Create front image plane
-                        const imageGeometry = new THREE.PlaneGeometry(width, height);
-                        const imageMaterial = new THREE.MeshBasicMaterial({
+                        // Adjust frame dimensions to fit the screen
+                        let frameWidth, frameHeight;
+                        if (aspectRatio > 1) {
+                            frameWidth = maxWidth;
+                            frameHeight = maxWidth / aspectRatio;
+                        } else {
+                            frameHeight = maxHeight;
+                            frameWidth = maxHeight * aspectRatio;
+                        }
+
+                        const frameDepth = 0.15;
+                        const borderSize = 0.15;
+
+                        frame = new THREE.Group();
+                        frame.position.set(0, 0, 0);
+
+                        // Main image
+                        const imageGeometry = new THREE.PlaneGeometry(frameWidth, frameHeight);
+                        const imageMaterial = new THREE.MeshStandardMaterial({
                             map: texture,
-                            side: THREE.FrontSide
+                            side: THREE.DoubleSide,
+                            roughness: 0.7,
+                            metalness: 0.1
                         });
                         const imageMesh = new THREE.Mesh(imageGeometry, imageMaterial);
-                        imageMesh.position.z = 0.001; // Slightly in front
+                        imageMesh.position.z = 0.01;
+                        imageMesh.castShadow = true;
                         frame.add(imageMesh);
 
-                        // Create back panel
-                        const backGeometry = new THREE.BoxGeometry(width + frameWidth * 2, height + frameWidth * 2, 0.05);
-                        const backMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-                        const backPanel = new THREE.Mesh(backGeometry, backMaterial);
-                        backPanel.position.z = -0.025;
-                        frame.add(backPanel);
-
-                        // Create frame
-                        const frameMaterial = new THREE.MeshPhongMaterial({ 
-                            color: 0x8B4513,
-                            specular: 0x222222,
-                            shininess: 30
+                        // Frame material
+                        const frameMaterial = new THREE.MeshStandardMaterial({
+                            color: 0x5a432e,
+                            roughness: 0.6,
+                            metalness: 0.3
                         });
 
-                        // Top frame
-                        const topFrame = new THREE.Mesh(
-                            new THREE.BoxGeometry(width + frameWidth * 2, frameWidth, depth),
-                            frameMaterial
-                        );
-                        topFrame.position.y = height/2 + frameWidth/2;
-                        frame.add(topFrame);
+                        // Frame borders
+                        const addBorder = (width, height, depth, position) => {
+                            const border = new THREE.Mesh(
+                                new THREE.BoxGeometry(width, height, depth),
+                                frameMaterial
+                            );
+                            border.position.copy(position);
+                            border.castShadow = true;
+                            frame.add(border);
+                        };
 
-                        // Bottom frame
-                        const bottomFrame = new THREE.Mesh(
-                            new THREE.BoxGeometry(width + frameWidth * 2, frameWidth, depth),
-                            frameMaterial
+                        // Top border
+                        addBorder(
+                            frameWidth + borderSize * 2,
+                            borderSize,
+                            frameDepth,
+                            new THREE.Vector3(0, frameHeight/2 + borderSize/2, 0)
                         );
-                        bottomFrame.position.y = -(height/2 + frameWidth/2);
-                        frame.add(bottomFrame);
 
-                        // Left frame
-                        const leftFrame = new THREE.Mesh(
-                            new THREE.BoxGeometry(frameWidth, height, depth),
-                            frameMaterial
+                        // Bottom border
+                        addBorder(
+                            frameWidth + borderSize * 2,
+                            borderSize,
+                            frameDepth,
+                            new THREE.Vector3(0, -frameHeight/2 - borderSize/2, 0)
                         );
-                        leftFrame.position.x = -(width/2 + frameWidth/2);
-                        frame.add(leftFrame);
 
-                        // Right frame
-                        const rightFrame = new THREE.Mesh(
-                            new THREE.BoxGeometry(frameWidth, height, depth),
-                            frameMaterial
+                        // Side borders
+                        addBorder(
+                            borderSize,
+                            frameHeight,
+                            frameDepth,
+                            new THREE.Vector3(-frameWidth/2 - borderSize/2, 0, 0)
                         );
-                        rightFrame.position.x = width/2 + frameWidth/2;
-                        frame.add(rightFrame);
+                        addBorder(
+                            borderSize,
+                            frameHeight,
+                            frameDepth,
+                            new THREE.Vector3(frameWidth/2 + borderSize/2, 0, 0)
+                        );
 
-                        // Add completed frame to scene
+                        // Back panel
+                        const backPanel = new THREE.Mesh(
+                            new THREE.BoxGeometry(
+                                frameWidth + borderSize * 2,
+                                frameHeight + borderSize * 2,
+                                0.05
+                            ),
+                            new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+                        );
+                        backPanel.position.z = -frameDepth/2;
+                        backPanel.castShadow = true;
+                        frame.add(backPanel);
+
                         scene.add(frame);
-                        
-                        // Set initial rotation
-                        frame.rotation.y = 0.2;
-
                         status.style.display = 'none';
                     },
                     undefined,
                     (error) => {
-                        console.error('Error loading texture:', error);
                         status.textContent = 'Error loading image';
+                        console.error(error);
                     }
                 );
+            }
+
+            function handleFileUpload(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const url = URL.createObjectURL(file);
+                    createPhotoFrame(url);
+                }
             }
 
             function onWindowResize() {
@@ -202,6 +265,13 @@
 
             function animate() {
                 requestAnimationFrame(animate);
+                
+                // Smooth rotation
+                if (frame) {
+                    frame.rotation.x += (targetRotationX - frame.rotation.x) * 0.1;
+                    frame.rotation.y += (targetRotationY - frame.rotation.y) * 0.1;
+                }
+
                 renderer.render(scene, camera);
             }
 
