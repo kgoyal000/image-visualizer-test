@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Realistic Photo Frame Viewer</title>
+    <title>Responsive Photo Frame Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; background: #f0f0f0; }
         canvas { display: block; }
@@ -53,6 +54,7 @@
             let targetRotationX = -0.1;
             let targetRotationY = 0.3;
             let isDragging = false;
+            let previousTouchPosition = { x: 0, y: 0 };
 
             function init() {
                 // Scene setup
@@ -127,9 +129,44 @@
                     targetRotationX += e.movementY * 0.005;
                 };
 
+                // Touch controls
+                const onTouchStart = (e) => {
+                    isDragging = true;
+                    previousTouchPosition = {
+                        x: e.touches[0].clientX,
+                        y: e.touches[0].clientY
+                    };
+                };
+
+                const onTouchMove = (e) => {
+                    if (!isDragging) return;
+
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - previousTouchPosition.x;
+                    const deltaY = touch.clientY - previousTouchPosition.y;
+
+                    targetRotationY += deltaX * 0.005;
+                    targetRotationX += deltaY * 0.005;
+
+                    previousTouchPosition = {
+                        x: touch.clientX,
+                        y: touch.clientY
+                    };
+                };
+
+                const onTouchEnd = () => {
+                    isDragging = false;
+                };
+
+                // Add event listeners
                 renderer.domElement.addEventListener('mousedown', onMouseDown);
                 document.addEventListener('mouseup', onMouseUp);
                 document.addEventListener('mousemove', onMouseMove);
+
+                renderer.domElement.addEventListener('touchstart', onTouchStart);
+                renderer.domElement.addEventListener('touchmove', onTouchMove);
+                renderer.domElement.addEventListener('touchend', onTouchEnd);
+
                 window.addEventListener('resize', onWindowResize);
                 renderer.domElement.style.cursor = 'grab';
             }
