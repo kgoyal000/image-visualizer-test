@@ -239,6 +239,10 @@
                         frame.add(backPanel);
 
                         scene.add(frame);
+
+                        // Adjust camera to fit the frame
+                        adjustCameraToFitFrame(frameWidth, frameHeight);
+
                         status.style.display = 'none';
                     },
                     undefined,
@@ -247,6 +251,17 @@
                         console.error(error);
                     }
                 );
+            }
+
+            function adjustCameraToFitFrame(frameWidth, frameHeight) {
+                // Calculate the distance required to fit the frame in the viewport
+                const maxDimension = Math.max(frameWidth, frameHeight);
+                const fov = camera.fov * (Math.PI / 180); // Convert FOV to radians
+                const distance = Math.abs(maxDimension / Math.sin(fov / 2));
+
+                // Position the camera
+                camera.position.z = distance * 1.2; // Add a little extra space
+                camera.lookAt(0, 0, 0);
             }
 
             function handleFileUpload(e) {
@@ -261,6 +276,13 @@
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
+
+                // Re-adjust camera if frame exists
+                if (frame) {
+                    const frameWidth = frame.children[0].geometry.parameters.width;
+                    const frameHeight = frame.children[0].geometry.parameters.height;
+                    adjustCameraToFitFrame(frameWidth, frameHeight);
+                }
             }
 
             function animate() {
