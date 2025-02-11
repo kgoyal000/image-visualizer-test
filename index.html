@@ -1,390 +1,410 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Realistic Photo Frame Viewer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <style>
-        body { margin: 0; background: #f0f0f0; }
-        canvas { display: block; }
-        #controls {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            z-index: 100;
-            font-family: Arial, sans-serif;
-        }
-        #status {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-family: Arial, sans-serif;
-            background: white;
-            padding: 10px 20px;
-            border-radius: 4px;
-            display: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .control-btn {
-            margin-top: 10px;
-            padding: 8px 12px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-    </style>
+  <title>Realistic Photo Frame Viewer with Product Textures</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    body { margin: 0; background: #f0f0f0; }
+    canvas { display: block; }
+    #controls {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      z-index: 100;
+      font-family: Arial, sans-serif;
+    }
+    #status {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: Arial, sans-serif;
+      background: white;
+      padding: 10px 20px;
+      border-radius: 4px;
+      display: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .control-btn {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    select {
+      margin-top: 10px;
+      padding: 6px 8px;
+      font-size: 1em;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
-    <div id="controls">
-        <input type="file" id="imageUpload" accept="image/*">
-        <button class="control-btn" id="resetPosition">Reset View</button>
-    </div>
-    <div id="status">Loading...</div>
-    <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        window.addEventListener('load', () => {
-            let scene, camera, renderer, frame;
-            const status = document.getElementById('status');
-            let targetRotationX = -0.1;
-            let targetRotationY = 0.3;
-            let isDragging = false;
-            let previousTouchPosition = { x: 0, y: 0 };
-            let zoomLevel = 5;
-            let touchDistance = 0;
+  <div id="controls">
+    <!-- File Upload (if you wish to override the texture selection) -->
+    <input type="file" id="imageUpload" accept="image/*">
+    <!-- Dropdown for selecting a product finish texture -->
+    <select id="productTextureSelect">
+      <option value="">Select Product Finish</option>
+      <option value="luster">Luster Finish (orange peel) | 260 gsm | 10 mil | Resin Coated Paper</option>
+      <option value="glossy">High Gloss Finish | 250 gsm | 10 mil | Resin Coated Paper</option>
+      <option value="metallicGlossy">High-Gloss Pearlescent Finish | 255 gsm | 10.4 mil | Resin Coated Paper</option>
+      <option value="hotPressBright">Hot Press Bright – Smooth Matte | 300gsm | 16 mil | 100% Cotton Rag</option>
+      <option value="coldPressBright">Cold Press Bright – Textured Matte | 305gsm | 19 mil | 100% Cotton Rag</option>
+      <option value="photoRag">Photo Rag – Textured Matte | 308 gsm | 18.9 mil | 100% Cotton Fiber</option>
+      <option value="williamTurner">William Turner – Textured Matte | 310 gsm | 24.4 mil | 100% Cotton Fiber</option>
+      <option value="fineArtBaryta">FineArt Baryta – Textured Glossy | 325 gsm | 16.14 mil | 100% Alpha Cellulose</option>
+    </select>
+    <button class="control-btn" id="resetPosition">Reset View</button>
+  </div>
+  <div id="status">Loading...</div>
+  <!-- Load Three.js from CDN -->
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      let scene, camera, renderer, frame;
+      const status = document.getElementById('status');
+      let targetRotationX = -0.1;
+      let targetRotationY = 0.3;
+      let isDragging = false;
+      let previousTouchPosition = { x: 0, y: 0 };
+      let zoomLevel = 5;
+      let touchDistance = 0;
 
-            function init() {
-                // Scene setup
-                scene = new THREE.Scene();
-                scene.background = new THREE.Color(0xf0f0f0);
+      // Mapping product finish keys to the image URLs you provided
+      const productTextures = {
+        luster: "https://thestackhouse.com/cdn/shop/files/Luster_DSC4340-575x450_4f593bb0-1328-4507-befe-c43bf150fc4d_440x295.png?v=1723771039",
+        glossy: "https://thestackhouse.com/cdn/shop/files/Glossy_DSC4329-575x450_440x295.png?v=1723756578",
+        metallicGlossy: "https://thestackhouse.com/cdn/shop/files/Metallic_DSC4332-575x450_440x295.png?v=1723756563",
+        hotPressBright: "https://thestackhouse.com/cdn/shop/files/paper1_440x295.webp?v=1728383842",
+        coldPressBright: "https://thestackhouse.com/cdn/shop/files/paper2_440x295.webp?v=1728383842",
+        photoRag: "https://thestackhouse.com/cdn/shop/files/paper3_440x295.webp?v=1728383842",
+        williamTurner: "https://thestackhouse.com/cdn/shop/files/paper4_440x295.webp?v=1728383842",
+        fineArtBaryta: "https://thestackhouse.com/cdn/shop/files/paper5_440x295.webp?v=1728383842"
+      };
 
-                // Camera setup
-                camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-                camera.position.set(0, 0, zoomLevel);
-                camera.lookAt(0, 0, 0);
+      function init() {
+        // Scene
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
 
-                // Renderer setup
-                renderer = new THREE.WebGLRenderer({ antialias: true });
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.shadowMap.enabled = true;
-                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                document.body.appendChild(renderer.domElement);
+        // Camera
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, zoomLevel);
+        camera.lookAt(0, 0, 0);
 
-                // Natural lighting setup
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-                scene.add(ambientLight);
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
 
-                const mainLight = new THREE.DirectionalLight(0xfff4e6, 0.8);
-                mainLight.position.set(3, 5, 5);
-                mainLight.castShadow = true;
-                mainLight.shadow.mapSize.width = 2048;
-                mainLight.shadow.mapSize.height = 2048;
-                mainLight.shadow.camera.near = 0.5;
-                mainLight.shadow.camera.far = 20;
-                scene.add(mainLight);
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
 
-                const fillLight = new THREE.DirectionalLight(0xfff4e6, 0.3);
-                fillLight.position.set(-3, 3, 3);
-                scene.add(fillLight);
+        const mainLight = new THREE.DirectionalLight(0xfff4e6, 0.8);
+        mainLight.position.set(3, 5, 5);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 20;
+        scene.add(mainLight);
 
-                // Wall setup
-                const wallGeometry = new THREE.PlaneGeometry(20, 20);
-                const wallMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xede7d9,
-                    roughness: 0.7,
-                    metalness: 0.1
-                });
-                const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                wall.position.set(0, 0, -2);
-                wall.rotation.y = Math.PI;
-                wall.receiveShadow = true;
-                scene.add(wall);
+        const fillLight = new THREE.DirectionalLight(0xfff4e6, 0.3);
+        fillLight.position.set(-3, 3, 3);
+        scene.add(fillLight);
 
-                setupEventListeners();
-                createPhotoFrame('https://thestackhouse.com/cdn/shop/files/article1_840x560.webp?v=1728383842');
-            }
-
-            function setupEventListeners() {
-                // File upload
-                document.getElementById('imageUpload').addEventListener('change', handleFileUpload);
-                
-                // Reset view
-                document.getElementById('resetPosition').addEventListener('click', () => {
-                    targetRotationX = -0.1;
-                    targetRotationY = 0.3;
-                    zoomLevel = 5;
-                    camera.position.set(0, 0, zoomLevel);
-                });
-
-                // Mouse controls
-                const onMouseDown = (e) => {
-                    isDragging = true;
-                    renderer.domElement.style.cursor = 'grabbing';
-                };
-
-                const onMouseUp = () => {
-                    isDragging = false;
-                    renderer.domElement.style.cursor = 'grab';
-                };
-
-                const onMouseMove = (e) => {
-                    if (!isDragging) return;
-                    
-                    targetRotationY += e.movementX * 0.005;
-                    targetRotationX += e.movementY * 0.005;
-                };
-
-                // Touch controls
-                const onTouchStart = (e) => {
-                    isDragging = true;
-                    previousTouchPosition = {
-                        x: e.touches[0].clientX,
-                        y: e.touches[0].clientY
-                    };
-                };
-
-                const onTouchMove = (e) => {
-                    if (!isDragging) return;
-
-                    if (e.touches.length === 1) {
-                        const touch = e.touches[0];
-                        const deltaX = touch.clientX - previousTouchPosition.x;
-                        const deltaY = touch.clientY - previousTouchPosition.y;
-
-                        targetRotationY += deltaX * 0.005;
-                        targetRotationX += deltaY * 0.005;
-
-                        previousTouchPosition = {
-                            x: touch.clientX,
-                            y: touch.clientY
-                        };
-                    }
-                };
-
-                const onTouchEnd = () => {
-                    isDragging = false;
-                };
-
-                // Zoom controls
-                const onWheel = (e) => {
-                    zoomLevel += e.deltaY * 0.01;
-                    zoomLevel = Math.max(2, Math.min(10, zoomLevel));
-                    camera.position.set(0, 0, zoomLevel);
-                };
-
-                // Pinch-to-zoom
-                const handlePinchZoom = (e) => {
-                    if (e.touches.length === 2) {
-                        const touch1 = e.touches[0];
-                        const touch2 = e.touches[1];
-                        const currentDistance = Math.hypot(
-                            touch1.clientX - touch2.clientX,
-                            touch1.clientY - touch2.clientY
-                        );
-                        
-                        if (touchDistance === 0) {
-                            touchDistance = currentDistance;
-                        } else {
-                            const delta = (currentDistance - touchDistance) * 0.01;
-                            zoomLevel -= delta;
-                            zoomLevel = Math.max(2, Math.min(10, zoomLevel));
-                            camera.position.set(0, 0, zoomLevel);
-                            touchDistance = currentDistance;
-                        }
-                    }
-                };
-
-                const resetTouchDistance = () => {
-                    touchDistance = 0;
-                };
-
-                // Add event listeners
-                renderer.domElement.addEventListener('mousedown', onMouseDown);
-                document.addEventListener('mouseup', onMouseUp);
-                document.addEventListener('mousemove', onMouseMove);
-
-                renderer.domElement.addEventListener('touchstart', onTouchStart);
-                renderer.domElement.addEventListener('touchmove', handlePinchZoom);
-                renderer.domElement.addEventListener('touchend', onTouchEnd);
-                renderer.domElement.addEventListener('touchend', resetTouchDistance);
-
-                renderer.domElement.addEventListener('wheel', onWheel);
-                window.addEventListener('resize', onWindowResize);
-                renderer.domElement.style.cursor = 'grab';
-            }
-
-            function createPhotoFrame(imageUrl) {
-                status.style.display = 'block';
-                status.textContent = 'Loading image...';
-
-                const textureLoader = new THREE.TextureLoader();
-                textureLoader.load(
-                    imageUrl,
-                    (texture) => {
-                        if (frame) scene.remove(frame);
-                        
-                        const aspectRatio = texture.image.width / texture.image.height;
-                        const maxWidth = 3.5;
-                        const maxHeight = 3.5;
-
-                        let frameWidth, frameHeight;
-                        if (aspectRatio > 1) {
-                            frameWidth = maxWidth;
-                            frameHeight = maxWidth / aspectRatio;
-                        } else {
-                            frameHeight = maxHeight;
-                            frameWidth = maxHeight * aspectRatio;
-                        }
-
-                        const frameDepth = 0.15;
-                        const borderSize = 0.15;
-
-                        frame = new THREE.Group();
-                        frame.position.set(0, 0, 0);
-
-                        // Main image
-                        const imageGeometry = new THREE.PlaneGeometry(frameWidth, frameHeight);
-                        const imageMaterial = new THREE.MeshStandardMaterial({
-                            map: texture,
-                            side: THREE.DoubleSide,
-                            roughness: 0.7,
-                            metalness: 0.1
-                        });
-                        const imageMesh = new THREE.Mesh(imageGeometry, imageMaterial);
-                        imageMesh.position.z = 0.01;
-                        imageMesh.castShadow = true;
-                        frame.add(imageMesh);
-
-                        // Frame material
-                        const frameMaterial = new THREE.MeshStandardMaterial({
-                            color: 0x4a3a2b,
-                            roughness: 0.7,
-                            metalness: 0.2,
-                            normalScale: new THREE.Vector2(0.3, 0.3)
-                        });
-
-                        // Load wood normal texture
-                        new THREE.TextureLoader().load(
-                            'https://threejs.org/examples/textures/wood/wood_normal.jpg',
-                            (normalMap) => {
-                                frameMaterial.normalMap = normalMap;
-                                frameMaterial.needsUpdate = true;
-                            }
-                        );
-
-                        // Frame borders
-                        const addBorder = (width, height, depth, position) => {
-                            const border = new THREE.Mesh(
-                                new THREE.BoxGeometry(width, height, depth),
-                                frameMaterial
-                            );
-                            border.position.copy(position);
-                            border.castShadow = true;
-                            frame.add(border);
-                        };
-
-                        // Top border
-                        addBorder(
-                            frameWidth + borderSize * 2,
-                            borderSize,
-                            frameDepth,
-                            new THREE.Vector3(0, frameHeight/2 + borderSize/2, 0)
-                        );
-
-                        // Bottom border
-                        addBorder(
-                            frameWidth + borderSize * 2,
-                            borderSize,
-                            frameDepth,
-                            new THREE.Vector3(0, -frameHeight/2 - borderSize/2, 0)
-                        );
-
-                        // Side borders
-                        addBorder(
-                            borderSize,
-                            frameHeight,
-                            frameDepth,
-                            new THREE.Vector3(-frameWidth/2 - borderSize/2, 0, 0)
-                        );
-                        addBorder(
-                            borderSize,
-                            frameHeight,
-                            frameDepth,
-                            new THREE.Vector3(frameWidth/2 + borderSize/2, 0, 0)
-                        );
-
-                        // Back panel
-                        const backPanel = new THREE.Mesh(
-                            new THREE.BoxGeometry(
-                                frameWidth + borderSize * 2,
-                                frameHeight + borderSize * 2,
-                                0.05
-                            ),
-                            new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
-                        );
-                        backPanel.position.z = -frameDepth/2;
-                        backPanel.castShadow = true;
-                        frame.add(backPanel);
-
-                        scene.add(frame);
-                        adjustCameraToFitFrame(frameWidth, frameHeight);
-                        status.style.display = 'none';
-                    },
-                    undefined,
-                    (error) => {
-                        status.textContent = 'Error loading image';
-                        console.error(error);
-                    }
-                );
-            }
-
-            function adjustCameraToFitFrame(frameWidth, frameHeight) {
-                const maxDimension = Math.max(frameWidth, frameHeight);
-                const fov = camera.fov * (Math.PI / 180);
-                const distance = Math.abs(maxDimension / Math.sin(fov / 2));
-                camera.position.z = distance * 1.2;
-                camera.lookAt(0, 0, 0);
-            }
-
-            function handleFileUpload(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const url = URL.createObjectURL(file);
-                    createPhotoFrame(url);
-                }
-            }
-
-            function onWindowResize() {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-
-                if (frame) {
-                    const frameWidth = frame.children[0].geometry.parameters.width;
-                    const frameHeight = frame.children[0].geometry.parameters.height;
-                    adjustCameraToFitFrame(frameWidth, frameHeight);
-                }
-            }
-
-            function animate() {
-                requestAnimationFrame(animate);
-                
-                if (frame) {
-                    frame.rotation.x += (targetRotationX - frame.rotation.x) * 0.1;
-                    frame.rotation.y += (targetRotationY - frame.rotation.y) * 0.1;
-                }
-
-                renderer.render(scene, camera);
-            }
-
-            init();
-            animate();
+        // Wall (as a background)
+        const wallGeometry = new THREE.PlaneGeometry(20, 20);
+        const wallMaterial = new THREE.MeshStandardMaterial({
+          color: 0xede7d9,
+          roughness: 0.7,
+          metalness: 0.1
         });
-    </script>
+        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+        wall.position.set(0, 0, -2);
+        wall.rotation.y = Math.PI;
+        wall.receiveShadow = true;
+        scene.add(wall);
+
+        setupEventListeners();
+
+        // On load, use the texture from the dropdown (if selected) or default to one of your images.
+        const productSelect = document.getElementById('productTextureSelect');
+        if (productSelect.value && productTextures[productSelect.value]) {
+          createPhotoFrame(productTextures[productSelect.value]);
+        } else {
+          // Default image (you may change this if desired)
+          createPhotoFrame(productTextures.luster);
+        }
+      }
+
+      function setupEventListeners() {
+        // File upload overrides the current texture selection
+        document.getElementById('imageUpload').addEventListener('change', handleFileUpload);
+
+        // Dropdown selection: load the selected texture image
+        document.getElementById('productTextureSelect').addEventListener('change', (e) => {
+          const selected = e.target.value;
+          if (selected && productTextures[selected]) {
+            createPhotoFrame(productTextures[selected]);
+          }
+        });
+
+        // Reset view
+        document.getElementById('resetPosition').addEventListener('click', () => {
+          targetRotationX = -0.1;
+          targetRotationY = 0.3;
+          zoomLevel = 5;
+          camera.position.set(0, 0, zoomLevel);
+        });
+
+        // Mouse controls
+        renderer.domElement.addEventListener('mousedown', (e) => {
+          isDragging = true;
+          renderer.domElement.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mouseup', () => {
+          isDragging = false;
+          renderer.domElement.style.cursor = 'grab';
+        });
+        document.addEventListener('mousemove', (e) => {
+          if (!isDragging) return;
+          targetRotationY += e.movementX * 0.005;
+          targetRotationX += e.movementY * 0.005;
+        });
+
+        // Touch controls
+        renderer.domElement.addEventListener('touchstart', (e) => {
+          isDragging = true;
+          previousTouchPosition = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY
+          };
+        });
+        renderer.domElement.addEventListener('touchmove', (e) => {
+          if (!isDragging) return;
+          if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - previousTouchPosition.x;
+            const deltaY = touch.clientY - previousTouchPosition.y;
+            targetRotationY += deltaX * 0.005;
+            targetRotationX += deltaY * 0.005;
+            previousTouchPosition = { x: touch.clientX, y: touch.clientY };
+          }
+        });
+        renderer.domElement.addEventListener('touchend', () => {
+          isDragging = false;
+        });
+
+        // Zoom controls (mouse wheel and pinch-to-zoom)
+        renderer.domElement.addEventListener('wheel', (e) => {
+          zoomLevel += e.deltaY * 0.01;
+          zoomLevel = Math.max(2, Math.min(10, zoomLevel));
+          camera.position.set(0, 0, zoomLevel);
+        });
+        renderer.domElement.addEventListener('touchmove', (e) => {
+          if (e.touches.length === 2) {
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(
+              touch1.clientX - touch2.clientX,
+              touch1.clientY - touch2.clientY
+            );
+            if (touchDistance === 0) {
+              touchDistance = currentDistance;
+            } else {
+              const delta = (currentDistance - touchDistance) * 0.01;
+              zoomLevel -= delta;
+              zoomLevel = Math.max(2, Math.min(10, zoomLevel));
+              camera.position.set(0, 0, zoomLevel);
+              touchDistance = currentDistance;
+            }
+          }
+        });
+        renderer.domElement.addEventListener('touchend', () => { touchDistance = 0; });
+        window.addEventListener('resize', onWindowResize);
+        renderer.domElement.style.cursor = 'grab';
+      }
+
+      // This function loads the provided image URL as a texture and creates the photo frame.
+      function createPhotoFrame(imageUrl) {
+        status.style.display = 'block';
+        status.textContent = 'Loading image...';
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load(
+          imageUrl,
+          (texture) => {
+            // Remove any existing frame
+            if (frame) scene.remove(frame);
+
+            // Determine dimensions based on the texture's aspect ratio
+            const aspectRatio = texture.image.width / texture.image.height;
+            const maxWidth = 3.5;
+            const maxHeight = 3.5;
+            let frameWidth, frameHeight;
+            if (aspectRatio > 1) {
+              frameWidth = maxWidth;
+              frameHeight = maxWidth / aspectRatio;
+            } else {
+              frameHeight = maxHeight;
+              frameWidth = maxHeight * aspectRatio;
+            }
+
+            const frameDepth = 0.15;
+            const borderSize = 0.15;
+            frame = new THREE.Group();
+            frame.position.set(0, 0, 0);
+
+            // Main image plane using the texture
+            const imageGeometry = new THREE.PlaneGeometry(frameWidth, frameHeight);
+            const imageMaterial = new THREE.MeshStandardMaterial({
+              map: texture,
+              side: THREE.DoubleSide,
+              roughness: 0.7,
+              metalness: 0.1
+            });
+            const imageMesh = new THREE.Mesh(imageGeometry, imageMaterial);
+            imageMesh.position.z = 0.01;
+            imageMesh.castShadow = true;
+            frame.add(imageMesh);
+
+            // Frame borders material (using a wood normal map for texture)
+            const frameMaterial = new THREE.MeshStandardMaterial({
+              color: 0xffffff,
+              roughness: 0.7,
+              metalness: 0.2
+            });
+            textureLoader.load(
+              'https://threejs.org/examples/textures/wood/wood_normal.jpg',
+              (normalMap) => {
+                frameMaterial.normalMap = normalMap;
+                frameMaterial.needsUpdate = true;
+              }
+            );
+
+            // Helper function to create a border piece
+            const addBorder = (width, height, depth, position) => {
+              const border = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, depth),
+                frameMaterial
+              );
+              border.position.copy(position);
+              border.castShadow = true;
+              frame.add(border);
+            };
+
+            // Top border
+            addBorder(
+              frameWidth + borderSize * 2,
+              borderSize,
+              frameDepth,
+              new THREE.Vector3(0, frameHeight / 2 + borderSize / 2, 0)
+            );
+            // Bottom border
+            addBorder(
+              frameWidth + borderSize * 2,
+              borderSize,
+              frameDepth,
+              new THREE.Vector3(0, -frameHeight / 2 - borderSize / 2, 0)
+            );
+            // Left border
+            addBorder(
+              borderSize,
+              frameHeight,
+              frameDepth,
+              new THREE.Vector3(-frameWidth / 2 - borderSize / 2, 0, 0)
+            );
+            // Right border
+            addBorder(
+              borderSize,
+              frameHeight,
+              frameDepth,
+              new THREE.Vector3(frameWidth / 2 + borderSize / 2, 0, 0)
+            );
+
+            // Back panel (using the same texture image in this demo)
+            const backPanelMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            textureLoader.load(
+              imageUrl,
+              (backTexture) => {
+                backPanelMaterial.map = backTexture;
+                backPanelMaterial.needsUpdate = true;
+              }
+            );
+            const backPanel = new THREE.Mesh(
+              new THREE.BoxGeometry(
+                frameWidth + borderSize * 2,
+                frameHeight + borderSize * 2,
+                0.05
+              ),
+              backPanelMaterial
+            );
+            backPanel.position.z = -frameDepth / 2;
+            backPanel.castShadow = true;
+            frame.add(backPanel);
+
+            scene.add(frame);
+            adjustCameraToFitFrame(frameWidth, frameHeight);
+            status.style.display = 'none';
+          },
+          undefined,
+          (error) => {
+            status.textContent = 'Error loading image';
+            console.error(error);
+          }
+        );
+      }
+
+      function adjustCameraToFitFrame(frameWidth, frameHeight) {
+        const maxDimension = Math.max(frameWidth, frameHeight);
+        const fov = camera.fov * (Math.PI / 180);
+        const distance = Math.abs(maxDimension / Math.sin(fov / 2));
+        camera.position.z = distance * 1.2;
+        camera.lookAt(0, 0, 0);
+      }
+
+      function handleFileUpload(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const url = URL.createObjectURL(file);
+          createPhotoFrame(url);
+        }
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        if (frame) {
+          const frameWidth = frame.children[0].geometry.parameters.width;
+          const frameHeight = frame.children[0].geometry.parameters.height;
+          adjustCameraToFitFrame(frameWidth, frameHeight);
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (frame) {
+          frame.rotation.x += (targetRotationX - frame.rotation.x) * 0.1;
+          frame.rotation.y += (targetRotationY - frame.rotation.y) * 0.1;
+        }
+        renderer.render(scene, camera);
+      }
+
+      init();
+      animate();
+    });
+  </script>
 </body>
 </html>
