@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Realistic Photo Frame Viewer – Variant Finish</title>
+  <title>Image Preview with Finish Variants</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
     body { margin: 0; background: #f0f0f0; }
@@ -48,9 +48,9 @@
 </head>
 <body>
   <div id="controls">
-    <!-- File Upload: This sets the main image that is always used in preview -->
+    <!-- Upload your image (this is the image that will always be shown) -->
     <input type="file" id="imageUpload" accept="image/*">
-    <!-- Dropdown for selecting a product finish variant -->
+    <!-- Select finish variant (the finish texture will be blended onto the image) -->
     <select id="productTextureSelect">
       <option value="">Select Product Finish</option>
       <option value="luster">Luster Finish (orange peel) | 260 gsm | 10 mil | Resin Coated Paper</option>
@@ -64,7 +64,7 @@
     </select>
     <button class="control-btn" id="resetPosition">Reset View</button>
   </div>
-  <div id="status">Loading...</div>
+  <div id="status">Loading image...</div>
   <!-- Load Three.js from CDN -->
   <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
@@ -78,13 +78,14 @@
       let zoomLevel = 5;
       let touchDistance = 0;
 
-      // Global variables to store the currently used main image and finish texture.
-      // Default main image (if no file is uploaded) – you can change this if desired.
+      // Global variables for the currently used main image and finish texture.
+      // (The main image comes from the upload; if none is uploaded, we use a default image.)
       let currentMainImageURL = "https://thestackhouse.com/cdn/shop/files/article1_840x560.webp?v=1728383842";
-      // Default finish texture: if no variant is selected, we’ll use a default wood finish.
-      let currentFinishTextureURL = null; // null means “use default wood finish”
+      // The finish texture is used to simulate the paper finish effect on the image.
+      // If no finish variant is selected, we’ll use a plain white overlay (i.e. no change).
+      let currentFinishTextureURL = null;
 
-      // Mapping product finish keys to the image URLs you provided.
+      // Mapping finish variant keys to the image URLs you provided.
       const productTextures = {
         luster: "https://thestackhouse.com/cdn/shop/files/Luster_DSC4340-575x450_4f593bb0-1328-4507-befe-c43bf150fc4d_440x295.png?v=1723771039",
         glossy: "https://thestackhouse.com/cdn/shop/files/Glossy_DSC4329-575x450_440x295.png?v=1723756578",
@@ -113,7 +114,7 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        // Lighting setup
+        // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
         scene.add(ambientLight);
 
@@ -130,7 +131,7 @@
         fillLight.position.set(-3, 3, 3);
         scene.add(fillLight);
 
-        // Wall (as a background)
+        // Background wall
         const wallGeometry = new THREE.PlaneGeometry(20, 20);
         const wallMaterial = new THREE.MeshStandardMaterial({
           color: 0xede7d9,
@@ -145,12 +146,12 @@
 
         setupEventListeners();
 
-        // Initially create the frame with the default main image and default finish.
+        // Create the preview using the current main image and finish (if any).
         createPhotoFrame(currentMainImageURL, currentFinishTextureURL);
       }
 
       function setupEventListeners() {
-        // File upload updates the main image while preserving the current finish.
+        // When a file is uploaded, update the main image.
         document.getElementById('imageUpload').addEventListener('change', (e) => {
           const file = e.target.files[0];
           if (file) {
@@ -159,11 +160,10 @@
           }
         });
 
-        // Dropdown selection: update the finish texture.
+        // When a finish variant is selected, update the finish texture.
         document.getElementById('productTextureSelect').addEventListener('change', (e) => {
           const selected = e.target.value;
-          // Update current finish texture based on selection (or null if none selected)
-          currentFinishTextureURL = selected && productTextures[selected] ? productTextures[selected] : null;
+          currentFinishTextureURL = (selected && productTextures[selected]) ? productTextures[selected] : null;
           createPhotoFrame(currentMainImageURL, currentFinishTextureURL);
         });
 
@@ -175,8 +175,8 @@
           camera.position.set(0, 0, zoomLevel);
         });
 
-        // Mouse controls
-        renderer.domElement.addEventListener('mousedown', (e) => {
+        // Mouse controls for rotating the frame
+        renderer.domElement.addEventListener('mousedown', () => {
           isDragging = true;
           renderer.domElement.style.cursor = 'grabbing';
         });
@@ -213,7 +213,7 @@
           isDragging = false;
         });
 
-        // Zoom controls (mouse wheel and pinch-to-zoom)
+        // Zoom controls
         renderer.domElement.addEventListener('wheel', (e) => {
           zoomLevel += e.deltaY * 0.01;
           zoomLevel = Math.max(2, Math.min(10, zoomLevel));
@@ -244,25 +244,20 @@
       }
 
       /**
-       * Creates the photo frame.
+       * Loads the main image and (optionally) the finish texture, then builds the preview.
        *
-       * @param {string} mainImageURL - URL for the main image (preview).
-       * @param {string|null} finishImageURL - URL for the finish texture to apply on frame borders.
-       *                                       If null, a default wood finish will be used.
+       * @param {string} mainImageURL - URL of the uploaded (or default) main image.
+       * @param {string|null} finishImageURL - URL of the finish texture to overlay on the image.
+       *                                       If null, a white (neutral) texture is used.
        */
       function createPhotoFrame(mainImageURL, finishImageURL) {
         status.style.display = 'block';
         status.textContent = 'Loading image...';
         const textureLoader = new THREE.TextureLoader();
-
-        // Load the main image texture.
         textureLoader.load(
           mainImageURL,
           (mainTexture) => {
-            // Remove any existing frame.
-            if (frame) scene.remove(frame);
-
-            // Determine dimensions based on the main image's aspect ratio.
+            // Compute dimensions based on the main image’s aspect ratio.
             const aspectRatio = mainTexture.image.width / mainTexture.image.height;
             const maxWidth = 3.5;
             const maxHeight = 3.5;
@@ -274,110 +269,34 @@
               frameHeight = maxHeight;
               frameWidth = maxHeight * aspectRatio;
             }
-
             const frameDepth = 0.15;
             const borderSize = 0.15;
+            // Remove any existing frame.
+            if (frame) scene.remove(frame);
             frame = new THREE.Group();
-            frame.position.set(0, 0, 0);
 
-            // Main image plane uses the uploaded image.
-            const imageGeometry = new THREE.PlaneGeometry(frameWidth, frameHeight);
-            const imageMaterial = new THREE.MeshStandardMaterial({
-              map: mainTexture,
-              side: THREE.DoubleSide,
-              roughness: 0.7,
-              metalness: 0.1
-            });
-            const imageMesh = new THREE.Mesh(imageGeometry, imageMaterial);
-            imageMesh.position.z = 0.01;
-            imageMesh.castShadow = true;
-            frame.add(imageMesh);
-
-            // Create the frame borders material.
-            const frameMaterial = new THREE.MeshStandardMaterial({
-              roughness: 0.7,
-              metalness: 0.2,
-              // You may adjust the base color as needed.
-              color: 0xffffff
-            });
-
-            // If a finish variant is selected, load that texture.
-            // Otherwise, load a default wood finish texture.
+            // Create the main image plane using a custom shader.
+            const planeGeometry = new THREE.PlaneGeometry(frameWidth, frameHeight);
+            // If no finish texture is provided, use a white 1x1 texture so the blend leaves the image unchanged.
             if (finishImageURL) {
               textureLoader.load(
                 finishImageURL,
                 (finishTexture) => {
-                  frameMaterial.map = finishTexture;
-                  frameMaterial.needsUpdate = true;
+                  createMainImageMesh(mainTexture, finishTexture, planeGeometry, frame, borderSize, frameDepth, frameWidth, frameHeight);
+                  scene.add(frame);
+                  adjustCameraToFitFrame(frameWidth, frameHeight);
+                  status.style.display = 'none';
                 }
               );
             } else {
-              // Default wood finish texture (using an example wood texture).
-              textureLoader.load(
-                'https://threejs.org/examples/textures/wood/wood_normal.jpg',
-                (woodTexture) => {
-                  frameMaterial.map = woodTexture;
-                  frameMaterial.needsUpdate = true;
-                }
-              );
+              const whiteData = new Uint8Array([255, 255, 255, 255]);
+              const whiteTexture = new THREE.DataTexture(whiteData, 1, 1, THREE.RGBAFormat);
+              whiteTexture.needsUpdate = true;
+              createMainImageMesh(mainTexture, whiteTexture, planeGeometry, frame, borderSize, frameDepth, frameWidth, frameHeight);
+              scene.add(frame);
+              adjustCameraToFitFrame(frameWidth, frameHeight);
+              status.style.display = 'none';
             }
-
-            // Helper function to add a border piece.
-            const addBorder = (width, height, depth, position) => {
-              const border = new THREE.Mesh(
-                new THREE.BoxGeometry(width, height, depth),
-                frameMaterial
-              );
-              border.position.copy(position);
-              border.castShadow = true;
-              frame.add(border);
-            };
-
-            // Top border.
-            addBorder(
-              frameWidth + borderSize * 2,
-              borderSize,
-              frameDepth,
-              new THREE.Vector3(0, frameHeight / 2 + borderSize / 2, 0)
-            );
-            // Bottom border.
-            addBorder(
-              frameWidth + borderSize * 2,
-              borderSize,
-              frameDepth,
-              new THREE.Vector3(0, -frameHeight / 2 - borderSize / 2, 0)
-            );
-            // Left border.
-            addBorder(
-              borderSize,
-              frameHeight,
-              frameDepth,
-              new THREE.Vector3(-frameWidth / 2 - borderSize / 2, 0, 0)
-            );
-            // Right border.
-            addBorder(
-              borderSize,
-              frameHeight,
-              frameDepth,
-              new THREE.Vector3(frameWidth / 2 + borderSize / 2, 0, 0)
-            );
-
-            // Back panel: always using a fixed material (wood-like dark color) as in the original code.
-            const backPanel = new THREE.Mesh(
-              new THREE.BoxGeometry(
-                frameWidth + borderSize * 2,
-                frameHeight + borderSize * 2,
-                0.05
-              ),
-              new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
-            );
-            backPanel.position.z = -frameDepth / 2;
-            backPanel.castShadow = true;
-            frame.add(backPanel);
-
-            scene.add(frame);
-            adjustCameraToFitFrame(frameWidth, frameHeight);
-            status.style.display = 'none';
           },
           undefined,
           (error) => {
@@ -385,6 +304,103 @@
             console.error(error);
           }
         );
+      }
+
+      /**
+       * Creates the main image mesh using a custom shader that blends the main image and finish texture.
+       */
+      function createMainImageMesh(mainTexture, finishTexture, geometry, frameGroup, borderSize, frameDepth, frameWidth, frameHeight) {
+        const shaderMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            uMainTexture: { value: mainTexture },
+            uFinishTexture: { value: finishTexture },
+            // Adjust this blend factor (0.0–1.0) to change how strongly the finish texture affects the image.
+            uBlend: { value: 0.5 }
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D uMainTexture;
+            uniform sampler2D uFinishTexture;
+            uniform float uBlend;
+            varying vec2 vUv;
+            void main(){
+              vec4 mainColor = texture2D(uMainTexture, vUv);
+              vec4 finishColor = texture2D(uFinishTexture, vUv);
+              // A simple blend: if finishColor is white, the image is unchanged;
+              // otherwise, the finish texture modulates the main image.
+              vec4 finalColor = mix(mainColor, mainColor * finishColor, uBlend);
+              gl_FragColor = finalColor;
+            }
+          `
+        });
+        const mainImageMesh = new THREE.Mesh(geometry, shaderMaterial);
+        mainImageMesh.position.z = 0.01;
+        mainImageMesh.castShadow = true;
+        frameGroup.add(mainImageMesh);
+
+        // --- Build the frame borders (these remain with a default wood look) ---
+        const frameMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        textureLoader = new THREE.TextureLoader();
+        textureLoader.load(
+          'https://threejs.org/examples/textures/wood/wood_normal.jpg',
+          (woodTexture) => {
+            frameMaterial.normalMap = woodTexture;
+            frameMaterial.needsUpdate = true;
+          }
+        );
+        // Helper to add a border piece.
+        function addBorder(width, height, depth, position, material) {
+          const border = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+          border.position.copy(position);
+          border.castShadow = true;
+          frameGroup.add(border);
+        }
+        // Top border
+        addBorder(
+          frameWidth + borderSize * 2,
+          borderSize,
+          frameDepth,
+          new THREE.Vector3(0, frameHeight / 2 + borderSize / 2, 0),
+          frameMaterial
+        );
+        // Bottom border
+        addBorder(
+          frameWidth + borderSize * 2,
+          borderSize,
+          frameDepth,
+          new THREE.Vector3(0, -frameHeight / 2 - borderSize / 2, 0),
+          frameMaterial
+        );
+        // Left border
+        addBorder(
+          borderSize,
+          frameHeight,
+          frameDepth,
+          new THREE.Vector3(-frameWidth / 2 - borderSize / 2, 0, 0),
+          frameMaterial
+        );
+        // Right border
+        addBorder(
+          borderSize,
+          frameHeight,
+          frameDepth,
+          new THREE.Vector3(frameWidth / 2 + borderSize / 2, 0, 0),
+          frameMaterial
+        );
+        // Back panel (always using a fixed dark color)
+        const backPanel = new THREE.Mesh(
+          new THREE.BoxGeometry(frameWidth + borderSize * 2, frameHeight + borderSize * 2, 0.05),
+          new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+        );
+        backPanel.position.z = -frameDepth / 2;
+        backPanel.castShadow = true;
+        frameGroup.add(backPanel);
       }
 
       function adjustCameraToFitFrame(frameWidth, frameHeight) {
